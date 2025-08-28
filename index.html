@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Group Chat</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 1200px;
+            height: 90vh;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            display: flex;
+            overflow: hidden;
+            animation: slideUp 0.5s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .sidebar {
+            width: 280px;
+            background: linear-gradient(180deg, #2d3748 0%, #1a202c 100%);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .sidebar h2 {
+            color: white;
+            font-size: 24px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .ai-status {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .ai-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .ai-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .ai-card:hover::before {
+            left: 100%;
+        }
+
+        .ai-card:hover {
+            transform: translateX(5px);
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .ai-card.active {
+            background: rgba(79, 209, 197, 0.3);
+            border: 1px solid #4fd1c5;
+        }
+
+        .ai-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            font-size: 16px;
+            position: relative;
+        }
+
+        .ai-avatar.chatgpt { background: linear-gradient(135deg, #10a37f, #00d9ff); }
+        .ai-avatar.claude { background: linear-gradient(135deg, #8b5cf6, #d946ef); }
+        .ai-avatar.gemini { background: linear-gradient(135deg, #4285f4, #ea4335); }
+        .ai-avatar.perplexity { background: linear-gradient(135deg, #00c7be, #00a19a); }
+        .ai-avatar.deepseek { background: linear-gradient(135deg, #2563eb, #7c3aed); }
+        .ai-avatar.grok { background: linear-gradient(135deg, #1da1f2, #14171a); }
+
+        .status-dot {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            border: 2px solid #2d3748;
+            background: #4fd1c5;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .ai-info {
+            flex: 1;
+        }
+
+        .ai-name {
+            color: white;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .ai-specialty {
+            color: #a0aec0;
+            font-size: 11px;
+            margin-top: 2px;
+        }
+
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-header {
+            padding: 20px 30px;
+            background: white;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-header h3 {
+            font-size: 20px;
+            color: #2d3748;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .typing-indicator {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: #f7fafc;
+            border-radius: 20px;
+        }
+
+        .typing-indicator.active {
+            display: flex;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #718096;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% {
+                transform: scale(0);
+            }
+            40% {
+                transform: scale(1);
+            }
+        }
+
+        .messages {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+            background: #fafbfc;
+        }
+
+        .message {
+            margin-bottom: 20px;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.user {
+            text-align: right;
+        }
+
+        .message-content {
+            display: inline-block;
+            max-width: 70%;
+            padding: 12px 18px;
+            border-radius: 18px;
+            position: relative;
+        }
+
+        .message.user .message-content {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.ai .message-content {
+            background: white;
+            color: #2d3748;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+        }
+
+        .message-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            font-size: 12px;
+            color: #718096;
+        }
+
+        .message.ai .message-header {
+            justify-content: flex-start;
+        }
+
+        .message.user .message-header {
+            justify-content: flex-end;
+        }
+
+        .mini-avatar {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            font-size: 10px;
+        }
+
+        .routing-info {
+            background: #f0fdf4;
+            border-left: 3px solid #10b981;
+            padding: 8px 12px;
+            margin-bottom: 15px;
+            border-radius: 0 8px 8px 0;
+            font-size: 13px;
+            color: #047857;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .input-area {
+            padding: 20px 30px;
+            background: white;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .input-wrapper {
+            display: flex;
+            gap: 12පx;
+            align-items: center;
+            background: #f7fafc;
+            border-radius: 25px;
+            padding: 8px 20px;
+            transition: all 0.3s ease;
+        }
+
+        .input-wrapper:focus-within {
+            background: white;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        #messageInput {
+            flex: 1;
+            border: none;
+            background: transparent;
+            padding: 10px 0;
+            font-size: 15px;
+            outline: none;
+        }
+
+        .send-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .send-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .send-btn:active {
+            transform: scale(0.95);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <h2>🤖 AI Agents</h2>
+            <div class="ai-status">
+                <div class="ai-card" data-ai="chatgpt">
+                    <div class="ai-avatar chatgpt">
+                        GPT
+                        <div class="status-dot"></div>
+                    </div>
+                    <div class="ai-info">
+                        <div class="ai-name">ChatGPT</div>
+                        <div class="ai-specialty">General, Creative, Code</div>
+                    </div>
+                </div>
+                <div class="ai-card" data-ai="claude">
+                    <div class="ai-avatar claude">
+                        CL
+                        <div class="status-dot"></div>
+                    </div>
+                    <div class="ai-info">
+                        <div class="ai-name">Claude</div>
+                        <div class="ai-specialty">Analysis, Writing, Ethics</div>
+                    </div>
+                </div>
+                <div class="ai-card" data-ai="gemini">
+                    <div class="ai-avatar gemini">
+                        GE
+                        <div class="status-dot"></div>
+                    </div>
+                    <div class="ai-info">
+                        <div class="ai-name">Gemini</div>
+                        <div class="ai-specialty">Research, Multimodal</div>
+                    </div>
+                </div>
+                <div class="ai-card" data-ai="perplexity">
+                    <div class="ai-avatar perplexity">
+                        PX
+                        <div class="status-dot"></div>
+                    </div>
+                    <div class="ai-info">
+                        <div class="ai-name">Perplexity</div>
+                        <div class="ai-specialty">Search, Facts, Citations</div>
+                    </div>
+                </div>
+                <div class="ai-card" data-ai="deepseek">
+                    <div class="ai-avatar deepseek">
+                        DS
+                        <div class="status-dot"></div>
+                    </div>
+                    <div class="ai-info">
+                        <div class="ai-name">DeepSeek</div>
+                        <div class="ai-specialty">Math, Reasoning, Code</div>
+                    </div>
+                </div>
+                <div class="ai-card" data-ai="grok">
+                    <div class="ai-avatar grok">
+                        GR
+                        <div class="status-dot"></div>
+                    </div>
+                    <div class="ai-info">
+                        <div class="ai-name">Grok</div>
+                        <div class="ai-specialty">Humor, Real-time, X/Twitter</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="chat-area">
+            <div class="chat-header">
+                <h3>💬 Group Chat</h3>
+                <div class="typing-indicator" id="typingIndicator">
+                    <span style="font-size: 12px; color: #718096;">AI is thinking</span>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                    <div class="typing-dot"></div>
+                </div>
+            </div>
+            
+            <div class="messages" id="messages">
+                <div class="message ai">
+                    <div class="message-header">
+                        <div class="mini-avatar" style="background: linear-gradient(135deg, #667eea, #764ba2);">🤖</div>
+                        <span>AI Group</span>
+                    </div>
+                    <div class="message-content">
+                        Welcome! I'm your AI group chat assistant. Ask me anything, and I'll route your question to the best AI model for the task. Try asking about coding, research, creative writing, or current events!
+                    </div>
+                </div>
+            </div>
+            
+            <div class="input-area">
+                <div class="input-wrapper">
+                    <input type="text" id="messageInput" placeholder="Type your message here..." autofocus>
+                    <button class="send-btn" onclick="sendMessage()">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const aiModels = {
+            chatgpt: {
+                name: 'ChatGPT',
+                avatar: 'GPT',
+                color: 'linear-gradient(135deg, #10a37f, #00d9ff)',
+                strengths: ['general', 'creative', 'code', 'conversation', 'writing']
+            },
+            claude: {
+                name: 'Claude',
+                avatar: 'CL',
+                color: 'linear-gradient(135deg, #8b5cf6, #d946ef)',
+                strengths: ['analysis', 'writing', 'ethics', 'reasoning', 'long-form']
+            },
+            gemini: {
+                name: 'Gemini',
+                avatar: 'GE',
+                color: 'linear-gradient(135deg, #4285f4, #ea4335)',
+                strengths: ['research', 'multimodal', 'google', 'visual', 'technical']
+            },
+            perplexity: {
+                name: 'Perplexity',
+                avatar: 'PX',
+                color: 'linear-gradient(135deg, #00c7be, #00a19a)',
+                strengths: ['search', 'facts', 'citations', 'current', 'news', 'real-time']
+            },
+            deepseek: {
+                name: 'DeepSeek',
+                avatar: 'DS',
+                color: 'linear-gradient(135deg, #2563eb, #7c3aed)',
+                strengths: ['math', 'reasoning', 'code', 'algorithms', 'complex']
+            },
+            grok: {
+                name: 'Grok',
+                avatar: 'GR',
+                color: 'linear-gradient(135deg, #1da1f2, #14171a)',
+                strengths: ['humor', 'real-time', 'twitter', 'x', 'casual', 'witty']
+            }
+        };
+
+        function selectBestAI(query) {
+            const lowerQuery = query.toLowerCase();
+            
+            // Keywords mapping to specific AIs
+            if (lowerQuery.includes('search') || lowerQuery.includes('latest') || lowerQuery.includes('news') || 
+                lowerQuery.includes('current') || lowerQuery.includes('today') || lowerQuery.includes('citation')) {
+                return 'perplexity';
+            }
+            
+            if (lowerQuery.includes('math') || lowerQuery.includes('algorithm') || lowerQuery.includes('calculate') ||
+                lowerQuery.includes('equation') || lowerQuery.includes('proof') || lowerQuery.includes('complex')) {
+                return 'deepseek';
+            }
+            
+            if (lowerQuery.includes('joke') || lowerQuery.includes('funny') || lowerQuery.includes('humor') ||
+                lowerQuery.includes('twitter') || lowerQuery.includes('meme')) {
+                return 'grok';
+            }
+            
+            if (lowerQuery.includes('image') || lowerQuery.includes('visual') || lowerQuery.includes('picture') ||
+                lowerQuery.includes('google') || lowerQuery.includes('research')) {
+                return 'gemini';
+            }
+            
+            if (lowerQuery.includes('ethics') || lowerQuery.includes('philosophy') || lowerQuery.includes('essay') ||
+                lowerQuery.includes('analysis') || lowerQuery.includes('long')) {
+                return 'claude';
+            }
+            
+            if (lowerQuery.includes('code') || lowerQuery.includes('programming') || lowerQuery.includes('javascript') ||
+                lowerQuery.includes('python') || lowerQuery.includes('creative')) {
+                return 'chatgpt';
+            }
+            
+            // Default to ChatGPT for general queries
+            return 'chatgpt';
+        }
+
+        function generateResponse(query, aiModel) {
+            const responses = {
+                chatgpt: [
+                    "I'll help you with that! Based on my analysis, here's what I think...",
+                    "Great question! Let me break this down for you...",
+                    "I'd be happy to assist! Here's my comprehensive take on this..."
+                ],
+                claude: [
+                    "Let me provide a thoughtful analysis of your question...",
+                    "This is an interesting ethical consideration. Here's my perspective...",
+                    "I'll approach this systematically and thoroughly..."
+                ],
+                gemini: [
+                    "Based on my research capabilities, I can tell you that...",
+                    "Let me search through multiple sources for you...",
+                    "I've analyzed this from multiple angles, and here's what I found..."
+                ],
+                perplexity: [
+                    "I've searched the latest information on this topic. According to recent sources...",
+                    "Based on current data and citations from reliable sources...",
+                    "Let me provide you with the most up-to-date information available..."
+                ],
+                deepseek: [
+                    "Let me work through this mathematical/logical problem step by step...",
+                    "This requires careful reasoning. Here's my analytical approach...",
+                    "I'll solve this systematically using advanced reasoning..."
+                ],
+                grok: [
+                    "Haha, great question! Here's my take with a dash of humor...",
+                    "Well, this is interesting! Let me give you the real scoop...",
+                    "Alright, buckle up for this witty explanation..."
+                ]
+            };
+            
+            const modelResponses = responses[aiModel] || responses.chatgpt;
+            return modelResponses[Math.floor(Math.random() * modelResponses.length)];
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const messagesDiv = document.getElementById('messages');
+            const typingIndicator = document.getElementById('typingIndicator');
+            
+            if (!input.value.trim()) return;
+            
+            const userMessage = input.value;
+            input.value = '';
+            
+            // Add user message
+            const userMessageDiv = document.createElement('div');
+            userMessageDiv.className = 'message user';
+            userMessageDiv.innerHTML = `
+                <div class="message-header">
+                    <span>You</span>
+                </div>
+                <div class="message-content">${userMessage}</div>
+            `;
+            messagesDiv.appendChild(userMessageDiv);
+            
+            // Show typing indicator
+            typingIndicator.classList.add('active');
+            
+            // Determine best AI
+            const selectedAI = selectBestAI(userMessage);
+            const aiInfo = aiModels[selectedAI];
+            
+            // Highlight selected AI
+            document.querySelectorAll('.ai-card').forEach(card => {
+                card.classList.remove('active');
+            });
+            document.querySelector(`[data-ai="${selectedAI}"]`).classList.add('active');
+            
+            // Simulate AI response delay
+            setTimeout(() => {
+                typingIndicator.classList.remove('active');
+                
+                // Add routing info
+                const routingDiv = document.createElement('div');
+                routingDiv.className = 'routing-info';
+                routingDiv.textContent = `🎯 Routing to ${aiInfo.name} - Best suited for this type of query`;
+                messagesDiv.appendChild(routingDiv);
+                
+                // Add AI response
+                const aiMessageDiv = document.createElement('div');
+                aiMessageDiv.className = 'message ai';
+                aiMessageDiv.innerHTML = `
+                    <div class="message-header">
+                        <div class="mini-avatar" style="background: ${aiInfo.color};">${aiInfo.avatar}</div>
+                        <span>${aiInfo.name}</span>
+                    </div>
+                    <div class="message-content">${generateResponse(userMessage, selectedAI)}</div>
+                `;
+                messagesDiv.appendChild(aiMessageDiv);
+                
+                // Scroll to bottom
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                
+                // Remove active highlight after response
+                setTimeout(() => {
+                    document.querySelector(`[data-ai="${selectedAI}"]`).classList.remove('active');
+                }, 2000);
+            }, 1500 + Math.random() * 1000);
+            
+            // Scroll to bottom
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        // Enter key to send
+        document.getElementById('messageInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>
